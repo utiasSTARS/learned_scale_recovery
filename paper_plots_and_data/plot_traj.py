@@ -4,8 +4,7 @@ import sys
 sys.path.append('../')
 import validate
 from pyslam.metrics import TrajectoryMetrics
-from run_inference import data_and_model_loader
-from utils.learning_helpers import save_obj, load_obj
+from utils.learning_helpers import save_obj, load_obj, data_and_model_loader
 import os
 from validate import compute_trajectory as tt
 import glob

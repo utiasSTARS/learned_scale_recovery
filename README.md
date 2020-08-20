@@ -1,4 +1,6 @@
-# learned_scale_recovery
+# Learned Scale Recovery
+Using a priori knowledge of a camera over a ground plane, we incorporate a scale recovery loss into the popular self-supervised depth and egomotion training procedure. In doing so, we enforce the observed scale factor to converge to unity during training, such that depth and egomotion predictions are accurate up to metric scale.
+
 Accompanying code for 'Self-Supervised Scale Recovery for Monocular Depth and Egomotion Estimation'
 
 ## Dependencies:

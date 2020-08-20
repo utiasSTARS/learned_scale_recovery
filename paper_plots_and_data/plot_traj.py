@@ -28,7 +28,7 @@ test_seq = '05'
 val_seq = '00'
 cam_height = 1.70 #1.52
 plot_range =  slice(0,-1)
-
+os.makedirs('figures', exist_ok=True)
 
 for seq in seq_list:
     tm_dict = {}

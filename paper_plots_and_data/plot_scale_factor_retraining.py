@@ -1,9 +1,11 @@
 import sys
 sys.path.append('../')
-
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.learning_helpers import save_obj, load_obj
+import os
+os.makedirs('figures', exist_ok=True)
+
 
 path_to_ws = '/home/brandon-wagstaff/learned_scale_recovery/'
 

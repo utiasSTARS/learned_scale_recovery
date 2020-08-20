@@ -4,7 +4,8 @@
 **.pdf
 **.jpg
 **.png
-**.mat
 **.tgn
 runs/**
 results/**
+data/orbslam-estimates/ground_truth/*
+data/orbslam-estimates/orbslam_mono_traj/*

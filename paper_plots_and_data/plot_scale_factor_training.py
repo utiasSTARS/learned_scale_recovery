@@ -9,8 +9,8 @@ import matplotlib
 matplotlib.use('Agg', warn=False)
 os.makedirs('figures', exist_ok=True)
 
-
-scaled_file = '/home/brandon-wagstaff/learned_scale_recovery/results/202007111233-kitti-scaled-good/scale_factor'
+path_to_ws = '/home/brandon-wagstaff/learned_scale_recovery/'
+scaled_file = path_to_ws+'results/202007111233-kitti-scaled-good/scale_factor'
 scale = load_obj(scaled_file)
 
 plt.rc('text', usetex=True)

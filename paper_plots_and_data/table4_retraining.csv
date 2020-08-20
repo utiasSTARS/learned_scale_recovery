@@ -1,0 +1,5 @@
+Method,Mean Trans. Seg. Err. (\%)
+,05,09,10,Mean
+Original,23.58,34.48,34.65,30.90
+Retrained (unscaled),10.61,17.31,15.56,14.49
+Retrained (scaled),1.51,4.00,2.88,2.79

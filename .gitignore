@@ -1,0 +1,9 @@
+**.pkl
+**.pth
+**.pdf
+**.jpg
+**.png
+**.mat
+**.tgn
+runs/**
+results/**

@@ -5,6 +5,7 @@
 !supplementary_material.pdf
 **.jpg
 **.png
+!data/system-overview.png
 **.tgn
 runs/**
 results/**

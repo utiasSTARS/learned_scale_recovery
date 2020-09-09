@@ -3,7 +3,7 @@ Using a priori knowledge of a camera over a ground plane, we incorporate a scale
 
 Accompanying code for 'Self-Supervised Scale Recovery for Monocular Depth and Egomotion Estimation'
 
-<img src="https://github.com/utiasSTARS/learned_scale_recovery/tree/master/data/loss-diagram.png" width="600px"/>
+<img src="https://github.com/utiasSTARS/learned_scale_recovery/blob/master/data/loss-diagram.png" width="600px"/>
 
 
 ## Dependencies:

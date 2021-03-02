@@ -14,7 +14,7 @@ from colour_demosaicing import demosaicing_CFA_Bayer_bilinear as demosaic
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument("--source_dir", type=str, default='/media/HDD1/datasets/oxford-robotcar')
-parser.add_argument("--target_dir", type=str, default='/media/m2-drive/datasets/oxford-robotcar-downsized')
+parser.add_argument("--target_dir", type=str, default='/media/datasets/oxford-robotcar-downsized')
 parser.add_argument("--camera_type", type=str, default='stereo')
 parser.add_argument("--remove_static", action='store_true', default=True)
 args = parser.parse_args()

@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0,'..')
 from utils.learning_helpers import *
 from utils.learning_helpers import disp_to_depth
+from data.kitti_loader import process_sample_batch
 
 class Plain_Trainer():
     def __init__(self, config, device, models, optimizer):
@@ -29,25 +30,9 @@ class Plain_Trainer():
         running_loss = 0.0           
             # Iterate over data.
         for data in dset:
-            target_img, source_imgs, lie_alg, intrinsics, _ = data
-            target_img_aug = target_img['color_aug_left'].to(dev)
-            lie_alg = lie_alg['color_aug']
-
-            source_img_list = []
-            source_img_aug_list = []
-            gt_lie_alg_list = []
-            vo_lie_alg_list = []
-            dt_list = []
-            for i, im, in enumerate(source_imgs['color_aug_left']):
-                source_img_aug_list.append(im.to(dev))
-                source_img_list.append(source_imgs['color_left'][i].to(dev))
-                gt_lie_alg_list.append(lie_alg[i][0].type(torch.FloatTensor).to(dev))
-                vo_lie_alg_list.append(lie_alg[i][1].type(torch.FloatTensor).to(dev))
-                dt_list.append(lie_alg[i][3].type(torch.FloatTensor).to(dev).expand_as(vo_lie_alg_list[-1][:,0:3]))
-
-            intrinsics_aug = intrinsics['color_aug_left'].type(torch.FloatTensor).to(dev)[:,0,:,:] #only need one matrix since it's constant across the training sample
-            intrinsics = intrinsics['color_left'].type(torch.FloatTensor).to(dev)[:,0,:,:]
-
+            target_img, source_img_list, gt_lie_alg_list, vo_lie_alg_list, flow_imgs, intrinsics, target_img_aug, \
+                source_img_aug_list, gt_lie_alg_aug_list, vo_lie_alg_aug_list, intrinsics_aug = process_sample_batch(data, self.config)
+                
             
             disparity = self.depth_model(target_img_aug, epoch=epoch)
             _,depth = disp_to_depth(disparity[0], self.config['min_depth'], self.config['max_depth'])

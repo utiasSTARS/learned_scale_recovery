@@ -1,3 +1,9 @@
+'''
+Use this if you want to train with left-right stereo constraints, or to have actual orbslam VO
+VO is used to initially train the pose network, which speeds up the start of training and improves stability of the depth
+network training
+'''
+
 import pykitti
 import numpy as np
 import scipy.io as sio
@@ -9,15 +15,16 @@ import argparse
 from liegroups import SE3
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument("--source_dir", type=str, default='/media/m2-drive/datasets/KITTI-odometry/')
-parser.add_argument("--target_dir", type=str, default='/media/m2-drive/datasets/KITTI-odometry-downsized')
+parser.add_argument("--source_dir", type=str, default='/media/datasets/KITTI-odometry/')
+parser.add_argument("--target_dir", type=str, default='/media/datasets/KITTI-odometry-downsized')
 parser.add_argument("--remove_static", action='store_true', default=False)
 args = parser.parse_args()
 
 
 resolutions = {'low_res': {'height':128, 'width': 448}, 'med_res': {'height':192, 'width': 640}, 'high_res': {'height':256,'width':832}}
 
-for resolution in ['low_res', 'med_res', 'high_res']:
+# for resolution in ['low_res', 'med_res', 'high_res']:
+for resolution in ['med_res']:
     target_dir = '{}/{}/'.format(args.target_dir,resolution)
     os.makedirs(target_dir, exist_ok=True)
     seq_info = {}
@@ -61,7 +68,6 @@ for resolution in ['low_res', 'med_res', 'high_res']:
         orig_img_width = img.shape[1]
         zoom_y = img_height/orig_img_height
         zoom_x = img_width/orig_img_width
-    #    img = np.array(Image.fromarray(img).crop([425, 65, 801, 305]))
         img = np.array(Image.fromarray(img).resize((img_width, img_height), resample = Image.ANTIALIAS))
         return img, zoom_x, zoom_y, orig_img_width, orig_img_height
     
@@ -78,6 +84,8 @@ for resolution in ['low_res', 'med_res', 'high_res']:
         print(len(data.cam2_files))
         seq_info['intrinsics_left'] = np.array(data.calib.K_cam2).reshape((-1,3,3)).repeat(len(data.cam2_files),0)
         seq_info['intrinsics_right'] = np.array(data.calib.K_cam3).reshape((-1,3,3)).repeat(len(data.cam3_files),0)
+        
+        # print(seq_info['intrinsics_left'], seq_info['intrinsics_right'])
         i = 0
         with concurrent.futures.ProcessPoolExecutor() as executor: 
             for filename, output in zip(data.cam2_files, executor.map(load_image, data.cam2_files)):
@@ -118,7 +126,8 @@ for resolution in ['low_res', 'med_res', 'high_res']:
         # stereo_seq_info['sparse_vo'] = stereo_traj
         
             ###Only keep keyframes
-                    
+        
+        print(keyframe_idx)
         mono_seq_info['intrinsics_left'] = mono_seq_info['intrinsics_left'][keyframe_idx]
         mono_seq_info['intrinsics_right'] = mono_seq_info['intrinsics_right'][keyframe_idx]
         mono_seq_info['cam_02'] = mono_seq_info['cam_02'][keyframe_idx]

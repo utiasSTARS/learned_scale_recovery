@@ -149,7 +149,7 @@ class depth_model(nn.Module):
         self.feature_convs = nn.ModuleList([self.conv(s,8) for s in upconv_planes[-self.num_scales:]])
         self.predict_disps = nn.ModuleList([self.predict_disp(disp_feature_sizes[i]) for i in range(0,self.num_scales)] ) 
 
-        
+
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -157,8 +157,7 @@ class depth_model(nn.Module):
 
 
     def forward(self, x, epoch=0):
-        factor = 1
-        
+
         x = (x - 0.45) / 0.22
         skips = self.encoder(x)
         
@@ -201,7 +200,7 @@ class depth_model(nn.Module):
             concat_depth_features.append(torch.cat(upsized,1))
 
         for i in np.arange(self.num_scales,0,-1):  
-            disps.append(factor*self.predict_disps[-i](concat_depth_features[-i]))
+            disps.append(self.predict_disps[-i](concat_depth_features[-i]))
             
         disps.reverse()
         return list(disps[0:self.num_scales])
@@ -230,51 +229,132 @@ class depth_model(nn.Module):
         )
 
     
-class pose_model(nn.Module):
-    def __init__(self, config): 
-        super(pose_model, self).__init__()
-        if config['flow_type'] != 'none':
-            num_input_frames = 8
-        else:
-            num_input_frames = 6
+def conv(in_planes, out_planes, kernel_size=3, stride=2, padding=1, dilation=1, bn_layer=False, bias=True):
+    if bn_layer:
+        return nn.Sequential(
+            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation, bias=bias),
+            nn.BatchNorm2d(out_planes),
+            nn.ReLU(inplace=True)
+        )
+    else: 
+        return nn.Sequential(
+            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
+            nn.ReLU(inplace=True)
+        )
+
+def linear(in_planes, out_planes):
+    return nn.Sequential(
+        nn.Linear(in_planes, out_planes), 
+        nn.ReLU(inplace=True)
+        )
+
+class BasicBlock(nn.Module):
+    expansion = 1
+    def __init__(self, inplanes, planes, stride, downsample, pad, dilation):
+        super(BasicBlock, self).__init__()
+
+        self.conv1 = conv(inplanes, planes, 3, stride, pad, dilation, bn_layer=True)
+        self.conv2 = nn.Conv2d(planes, planes, 3, 1, pad, dilation)
+
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.conv2(out)
+
+        if self.downsample is not None:
+            x = self.downsample(x)
+        out += x
+
+        return F.relu(out, inplace=True)
+
+class ImgEncoder(nn.Module):
+    def __init__(self, config):
+        super(ImgEncoder, self).__init__()
         self.config = config
-        self.num_input_frames = num_input_frames
+        if self.config['flow_type'] == 'classical':
+            inputnum = 8
+        else:
+            inputnum = 6
+        blocknums = [2,2,3,4,6,7,3]
+        self.outputnums = [32,64,64,128,128,256,256]
+
+        self.firstconv = nn.Sequential(conv(inputnum, 32, 3, 2, 1, 1, False),
+                                       conv(32, 32, 3, 1, 1, 1),
+                                       conv(32, 32, 3, 1, 1, 1))
+
+        self.inplanes = 32
+
+        self.layer1 = self._make_layer(BasicBlock, self.outputnums[2], blocknums[2], 2, 1, 1) # 40 x 28
+        self.layer2 = self._make_layer(BasicBlock, self.outputnums[3], blocknums[3], 2, 1, 1) # 20 x 14
+        self.layer3 = self._make_layer(BasicBlock, self.outputnums[4], blocknums[4], 2, 1, 1) # 10 x 7
+        self.layer4 = self._make_layer(BasicBlock, self.outputnums[5], blocknums[5], 2, 1, 1) # 5 x 4
+        self.layer5 = self._make_layer(BasicBlock, self.outputnums[6], blocknums[6], 2, 1, 1) # 3 x 2
 
 
-        self.convs = {}
-        self.convs[0] = nn.Conv2d(num_input_frames, 16, 3, 1)
-        self.convs[1] = nn.Conv2d(16, 32, 3, 2)
-        self.convs[2] = nn.Conv2d(32, 64, 3, 3)
-        self.convs[3] = nn.Conv2d(64, 128, 3, 2)
-        self.convs[4] = nn.Conv2d(128, 256, 3, 2)
-        self.convs[5] = nn.Conv2d(256, 512, 3, 2)
-        final = 1024
-        self.convs[6] = nn.Conv2d(512, final, 3, 2)
-        self.avgpool = nn.AvgPool2d((1,5))
+
+    def _make_layer(self, block, planes, blocks, stride, pad, dilation):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+           downsample = nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride)
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample, pad, dilation))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes,1,None,pad,dilation))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.firstconv(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.layer5(x)
+        x = x.view(x.shape[0], -1)
+
+        return x
+
+class pose_model(nn.Module):
+    def __init__(self, config):
+        super(pose_model, self).__init__()
+        self.config = config
+        self.img_encoder = ImgEncoder(config)
+        
+        if config['img_resolution'] == 'med':
+            fcnum = self.img_encoder.outputnums[6] * 30
+        if config['img_resolution'] == 'low':
+            fcnum = self.img_encoder.outputnums[6] * 14
+
+        fc1_trans = linear(fcnum, 128)
+        fc2_trans = linear(128,32)
+        fc3_trans = nn.Linear(32,3)
+
+        fc1_rot = linear(fcnum, 128)
+        fc2_rot = linear(128,32)
+        fc3_rot = nn.Linear(32,3)
+        self.trans = nn.Sequential(fc1_trans, fc2_trans, fc3_trans)
+        self.rot = nn.Sequential(fc1_rot, fc2_rot, fc3_rot)
 
 
-        self.trans_conv = nn.Conv2d(final, 3, 1,1)
-        self.rot_conv = nn.Conv2d(final,3,1,1)
-        self.num_convs = len(self.convs)
+        # self.voflow_trans = nn.ModuleList([nn.Sequential(fc1_trans, fc2_trans, fc3_trans) for i in range(0,num_heads)])
+        # self.voflow_rot = nn.ModuleList([nn.Sequential(fc1_rot, fc2_rot, fc3_rot) for i in range(0, num_heads)])        
+        
 
-        self.relu = nn.ReLU(True)
-
-        self.net = nn.ModuleList(list(self.convs.values()))
-
-    def forward(self, imgs, T21=None, epoch=0):
+    def forward(self, imgs, flow=None, T21=None, epoch=None):
         if self.config['flow_type'] == 'none':
             imgs = imgs[0:2] # get rid third img (the optical flow image) if not wanted
         imgs = torch.cat(imgs,1)
         imgs = (imgs - 0.45)/0.22
 
-        for i in range(self.num_convs):
-            imgs = self.convs[i](imgs)
-            imgs = self.relu(imgs)
+        features = self.img_encoder( imgs )  #
 
-        features = self.avgpool(imgs)
-        trans = self.trans_conv(features)
-        rot = self.rot_conv(features)
-        pose = torch.cat([trans, rot],1).reshape((-1,6))
+        x_trans = self.trans(features)
+        x_rot = self.rot(features)
+        pose = torch.cat((0.01*x_trans, x_rot),dim=1)   
 
-        pose = 0.01 * pose #small pose initialization helps with stability at the start of training
         return pose

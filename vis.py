@@ -52,8 +52,8 @@ def plot_multi_traj(traj1, label_str1, traj2, label_str2, title_str):
     fig = plt.figure(1)
     ax = plt.gca()
     
-    ax.plot(traj1[:,0,3], traj1[:,1,3], label=label_str1)
-    ax.plot(traj2[:,0,3], traj2[:,1,3], '--', label=label_str2)
+    ax.plot(traj1[:,0,3], traj1[:,2,3], label=label_str1)
+    ax.plot(traj2[:,0,3], traj2[:,2,3], '--', label=label_str2)
     ax.set_title(title_str)
     ax.legend()
     
@@ -68,7 +68,7 @@ def plot_traj(pred, label_str, title_str):
     fig = plt.figure(1)
     ax = plt.gca()
     
-    ax.plot(pred[:,0,3], pred[:,1,3], '--', label=label_str)
+    ax.plot(pred[:,0,3], pred[:,2,3], '--', label=label_str)
     ax.set_title(title_str)
     ax.legend()
     
@@ -158,7 +158,16 @@ class UnNormalize:
 
 
 
-
+def plotN(data, labels=None):
+    num_plots = data[0].shape[1]
+    fig, ax = plt.subplots(num_plots, 1, sharex='col', sharey='row')
+    
+    for i in range(0,num_plots):
+        for idx, d in enumerate(data):
+            ax[i].plot(d[:,i],label=labels[idx], linewidth=2/(idx+1))
+    
+    ax[0].legend()
+    return fig
 
 
 

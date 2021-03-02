@@ -3,6 +3,45 @@ import torch.nn.functional as F
 import torch.nn as nn
 from models.depth_and_egomotion import *
 
+def scale_recovery(plane_est, depth, intrinsics, h_gt=1.70):
+    plane_est = plane_est**3      
+    b, _, h, w = depth.size()
+    plane_est_down = torch.nn.functional.interpolate(plane_est.clone(),(int(h/4),int(w/4)),mode='bilinear') 
+    depth_down = torch.nn.functional.interpolate(depth, (int(h/4),int(w/4)),mode='bilinear')
+    int_inv = intrinsics.clone()
+    int_inv[:,0:2,:] = int_inv[:,0:2,:]/4
+    int_inv = int_inv.inverse()
+    b, _, h, w = depth_down.size()
+        
+    i_range = torch.arange(0, h).view(1, h, 1).expand(1,h,w).type_as(depth_down)  # [1, H, W]
+    j_range = torch.arange(0, w).view(1, 1, w).expand(1,h,w).type_as(depth_down)  # [1, H, W]
+    ones = torch.ones(1,h,w).type_as(depth_down)
+    pixel_coords = torch.stack((j_range, i_range, ones), dim=1)  # [1, 3, H, W]
+        ###pixel_coords is an array of camera pixel coordinates (x,y,1) where x,y origin is the upper left corner of the image.
+    current_pixel_coords = pixel_coords[:,:,:h,:w].expand(b,3,h,w).view(b,3,-1) #.contiguous().view(b, 3, -1)  # [B, 3, H*W]
+
+    cam_coords = int_inv.bmm(current_pixel_coords).view(b,3,h,w)
+    cam_coords = cam_coords*depth_down
+    cam_coords = cam_coords.reshape((b,3,-1)).permute(0,2,1) ## b, N, 3
+    plane_est_down = plane_est_down.view(b,-1) ##b, N
+
+    ## Weighted Least Squares
+    W = torch.diag_embed(plane_est_down).type_as(plane_est_down)
+    h = torch.ones(b,h*w,1).type_as(plane_est_down)
+
+    left = (h.permute(0,2,1)).bmm(W).bmm(cam_coords)
+    right = torch.pinverse((cam_coords.permute(0,2,1)).bmm(W).bmm(cam_coords))
+    normal = (left.bmm(right)).permute(0,2,1)
+
+    n = normal/( torch.norm(normal,dim=1).reshape(b,1,1).expand_as(normal) ) ## b,3,1 
+
+    heights = cam_coords.bmm(n) ## b, N, 1
+    height = ( (plane_est_down * heights[:,:,0]).sum(dim=1) )/(plane_est_down.sum(dim=1))
+
+    scale_factor = ((h_gt)/height ).detach() ## scale factor is 1 if height is proper, smaller than 1 if height is too short
+    # print(scale_factor)
+    return scale_factor
+
 class PlaneModel(nn.Module):
     def __init__(self, config): 
         super(PlaneModel, self).__init__()

@@ -24,6 +24,7 @@ def get_data_transforms(config):
         ]),
         'test': Compose([
             PILtoNumpy(),
+            # RandomHorizontalFlip(p=1),
             ArrayToTensor(),
         ])
     }
@@ -110,7 +111,7 @@ class RandomHorizontalFlip(object):
     def __call__(self, original, transformed):
         if self.prob is not None:
             prob = np.random.uniform(low=0, high=1)
-            if prob <= self.prob:
+            if prob < self.prob:
                 output_intrinsics = np.copy(original[1])
                 w = original[0][0].shape[1]
 

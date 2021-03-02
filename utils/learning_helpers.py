@@ -8,7 +8,7 @@ import pickle
 
 import sys
 sys.path.insert(0,'..')
-from data.kitti_loader import KittiLoaderPytorch
+import models.packetnet_depth_and_egomotion as models_packetnet
 import models.depth_and_egomotion as models
 from utils.custom_transforms import *
 
@@ -115,6 +115,12 @@ def moving_average(a, n) : #n must be odd)
     import torch
     
 def data_and_model_loader(config, pretrained_depth_path, pretrained_pose_path, seq=None, load_depth=True):
+    
+    if config['data_format'] == 'odometry':
+        from data.kitti_loader_stereo import KittiLoaderPytorch
+        # from data.kitti_loader import KittiLoaderPytorch
+    if config['data_format'] == 'eigen':
+        from data.kitti_loader_eigen import KittiLoaderPytorch
     if seq == None:
         seq = config['test_seq']
     else:
@@ -126,7 +132,8 @@ def data_and_model_loader(config, pretrained_depth_path, pretrained_pose_path, s
     
     if load_depth:
         depth_model = models.depth_model(config).to(device)
-    pose_model = models.pose_model(config).to(device)
+    pose_model = models_packetnet.pose_model(config).to(device)
+    # pose_model = models.pose_model(config).to(device)
     
     if pretrained_depth_path is not None and load_depth==True:
         depth_model.load_state_dict(torch.load(pretrained_depth_path))

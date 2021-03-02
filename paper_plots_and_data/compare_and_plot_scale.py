@@ -14,23 +14,21 @@ import matplotlib
 # Removes the XWindows backend (useful for producing plots via tmux without -X)
 matplotlib.use('Agg', warn=False)
 
-path_to_ws = '/home/brandon-wagstaff/learned_scale_recovery/'
-path_to_dset_downsized = '/media/m2-drive/datasets/KITTI-odometry-downsized/'
-seq_list = ['00', '02', '05', '06', '07', '08', '09', '10'] 
+path_to_ws = '/home/brandonwagstaff/learned_scale_recovery/'
+path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
+seq_list = ['00_02', '02_02', '06_02', '07_02', '08_02', '05_02', '09_02', '10_02'] 
 method_list = ['scaled', 'unscaled']
-dir_list = [path_to_ws+'results/202007111233-kitti-scaled-good', \
-    path_to_ws+'results/202007100900-kitti-unscaled'
+
+dir_list = [path_to_ws+'results/final_models/vo-kitti-scaled-202102182020', \
+    path_to_ws+'results/final_models/vo-kitti-unscaled-202102201302'
     ]
 
-test_seq = '05'
-val_seq = '00'
-cam_height = 1.70 #1.52
-plot_range =  slice(0,-1)
+
 csv_header1 = ['Method', 'Sequence']
-csv_header2 = ['', 'Train', 'Val', 'Test']
+csv_header2 = ['', 'Train', '', '', '','', 'Val', 'Test']
 csv_header3 = [''] + seq_list + ['Mean']
 
-with open('table3_scale_variance.csv', "w") as f:
+with open('scale_variance_full.csv', "w") as f:
     writer = csv.writer(f)
     writer.writerow(csv_header1)
     writer.writerow(csv_header2)
@@ -39,7 +37,7 @@ with open('table3_scale_variance.csv', "w") as f:
     scale_factors = {}
     for method, dir in zip(method_list, dir_list):
         scale_factors[method] = {}
-        scale_variance = []
+        scale_factor_std_dev_list = []
         for seq in seq_list:
             results_dir = dir + '/results/scale/'
             config = load_obj('{}/config'.format(dir))
@@ -57,48 +55,40 @@ with open('table3_scale_variance.csv', "w") as f:
             
             dist_to_plane = data['dist_to_plane']
             fwd_pose_vec1 = data['fwd_pose_vec1']
-            fwd_pose_vec2 = data['fwd_pose_vec2']
             inv_pose_vec1 = data['inv_pose_vec1']
-            inv_pose_vec2 = data['inv_pose_vec2']
             gt_pose_vec = data['gt_pose_vec']
-            vo_pose_vec = data['vo_pose_vec']
-            num_inliers = data['num_inliers']
-            normals = data['normal']
+
             if config['dpc'] == False:
                 prefix = ''
             if config['dpc'] == True:
                 prefix = prefix = 'dpc-'
 
-            d = [np.median(np.abs(i)) for i in dist_to_plane] 
-            d  = np.array(d)
-            average_d = np.average(d) 
-            
-            unscaled_pose_vec = fwd_pose_vec1
-            unscaled_pose_vec[:,3:6] = gt_pose_vec[:,3:6]
-            
-            print('seq {} {} scale factor: {}'.format(seq, method, cam_height/average_d))
-            print('seq {} {} scale factor variance: {}'.format(seq, method, np.var(cam_height/d)))            
-            
-            scale_variance.append(np.var(cam_height/d))
-            
-            scale_factors[method][seq] = cam_height/d
-            
-        mean_var = np.mean(scale_variance)
-        scale_variance.append(mean_var)
-        scale_variance = ["%.4f" % e for e in scale_variance]
-        writer.writerow([method] + scale_variance)
+            scale_factor = data['learned_scale_factor']
+            scale_factor_mean = np.average(scale_factor)
+            scale_factor_std = np.std(scale_factor)
+            scale_factor_std_dev_list.append(scale_factor_std)
+            scale_factors[method][seq] = scale_factor
+            print('seq {} {} scale factor: {}'.format(seq, method, scale_factor_mean))
+            print('seq {} {} scale factor std. dev.: {}'.format(seq, method, scale_factor_std))
+
+
+        mean_std = np.mean(scale_factor_std_dev_list)
+        scale_factor_std_dev_list.append(mean_std)
+        scale_factor_std_dev_list = ["%.4f" % e for e in scale_factor_std_dev_list]
+        writer.writerow([method] + scale_factor_std_dev_list)
         
 for seq in seq_list:
     plt.figure()
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.15)
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.tick_params(labelsize=22)
     plt.grid()
-    plt.plot(scale_factors['scaled'][seq][plot_range], linewidth=2, label='Scaled', rasterized=True)
-    plt.plot(scale_factors['unscaled'][seq][plot_range], linewidth=2, label='Unscaled', rasterized=True)
+    plt.plot(scale_factors['scaled'][seq], linewidth=2, label='Scaled', rasterized=True)
+    plt.plot(scale_factors['unscaled'][seq], linewidth=2, label='Unscaled', rasterized=True)
     plt.legend(fontsize=15)
     plt.ylim([0.6,2.4])
     plt.ylabel('Scale Factor', fontsize=22)
     plt.xlabel('Timestep', fontsize=22)
-    # plt.title('Seq. {} Scale Factor Comparison'.format(seq), fontsize=20)
     plt.savefig('figures/seq-{}-scale.pdf'.format(seq))

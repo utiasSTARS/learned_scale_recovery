@@ -1,6 +1,9 @@
-'''Loads both left and right images for specified KITTI sequence)
+'''Loads both left and right images for specified KITTI sequence, while treating each image stream as a separate sequence
+(can't be used for stereo-image loasses like left-right consistency)
 
-Must run 'create_kitti_odometry_data.py' before using this loader to preprocess the data.
+If a sequence is specified as test/validation, neither the left or right images are included in the training data
+
+Must run 'create_kitti_odometry_data_w_stereo.py' before using this loader to preprocess the data.
 '''
 
 import cv2
@@ -14,123 +17,41 @@ from liegroups import SE3, SO3
 import os
 import glob
 
-def process_sample(data, config):
-    target_img, source_imgs, lie_alg, intrinsics, flow_imgs = data
-    device = config['device']
-    lie_alg_aug = lie_alg['color_aug']
-    lie_alg = lie_alg['color']
-
-    target_img_aug, source_imgs_aug, intrinsics_aug = target_img['color_aug_left'], source_imgs['color_aug_left'], intrinsics['color_aug_left']    
-    target_img, source_imgs, intrinsics = target_img['color_left'], source_imgs['color_left'], intrinsics['color_left']
-    target_img = target_img.to(device).unsqueeze(0)
-    target_img_aug = target_img_aug.to(device).unsqueeze(0)
-    
-    source_img_list = []
-    gt_lie_alg_list = []
-    vo_lie_alg_list = []
-    
-    source_img_aug_list = []
-    gt_lie_alg_aug_list = []
-    vo_lie_alg_aug_list = []
-
-    for i, im, in enumerate(source_imgs):
-        source_img_list.append(im.to(device).unsqueeze(0))
-        gt_lie_alg_list.append(torch.from_numpy(lie_alg[i][0]).type(torch.FloatTensor).to(device).unsqueeze(0))
-        vo_lie_alg_list.append(torch.from_numpy(lie_alg[i][1]).type(torch.FloatTensor).to(device).unsqueeze(0))
-
-        source_img_aug_list.append(source_imgs_aug[i].to(device).unsqueeze(0))
-        gt_lie_alg_aug_list.append(torch.from_numpy(lie_alg_aug[i][0]).type(torch.FloatTensor).to(device).unsqueeze(0))
-        vo_lie_alg_aug_list.append(torch.from_numpy(lie_alg_aug[i][1]).type(torch.FloatTensor).to(device).unsqueeze(0))
-
-    if config['flow_type'] == 'classical':
-        flow_imgs_fwd, flow_imgs_back = flow_imgs
-        flow_imgs_fwd_list, flow_imgs_back_list = [], []
-        for i in range(0, len(flow_imgs_fwd)):
-            flow_imgs_fwd_list.append(flow_imgs_fwd[i].to(device).unsqueeze(0))
-            flow_imgs_back_list.append(flow_imgs_back[i].to(device).unsqueeze(0))
-        flow_imgs = [flow_imgs_fwd_list, flow_imgs_back_list]
-    else:
-        flow_imgs = [[None for i in range(0,len(source_img_list))] for i in range(0,2)] #annoying but necessary
-
-    intrinsics = torch.from_numpy(intrinsics).type(torch.FloatTensor).unsqueeze(0).to(device)[:,0,:,:] #only need one matrix since it's constant across the training sample
-    intrinsics_aug = torch.from_numpy(intrinsics_aug).type(torch.FloatTensor).unsqueeze(0).to(device)[:,0,:,:] #only need one matrix since it's constant across the training sample
-
-    return target_img, source_img_list, gt_lie_alg_list, vo_lie_alg_list, flow_imgs, intrinsics, \
-            target_img_aug, source_img_aug_list, gt_lie_alg_aug_list, vo_lie_alg_aug_list, intrinsics_aug,
-def process_sample_batch(data, config):
-    device = config['device']
-    target_img, source_imgs, lie_alg, intrinsics, flow_imgs = data
-    target_img_aug = target_img['color_aug_left'].to(device)
-    target_img = target_img['color_left'].to(device)
-    lie_alg_aug = lie_alg['color_aug']
-    lie_alg = lie_alg['color']
-
-    source_img_list = []
-    gt_lie_alg_list = []
-    vo_lie_alg_list = []
-    
-    source_img_aug_list = []
-    gt_lie_alg_aug_list = []
-    vo_lie_alg_aug_list = []    
-    
-    for i, im, in enumerate(source_imgs['color_aug_left']):
-        source_img_aug_list.append(im.to(device))
-        source_img_list.append(source_imgs['color_left'][i].to(device))
-        gt_lie_alg_list.append(lie_alg[i][0].type(torch.FloatTensor).to(device))
-        vo_lie_alg_list.append(lie_alg[i][1].type(torch.FloatTensor).to(device))
-        gt_lie_alg_aug_list.append(lie_alg_aug[i][0].type(torch.FloatTensor).to(device))
-        vo_lie_alg_aug_list.append(lie_alg_aug[i][1].type(torch.FloatTensor).to(device))
-
-    if config['flow_type'] == 'classical':
-        flow_imgs_fwd, flow_imgs_back = flow_imgs
-        flow_imgs_fwd_list, flow_imgs_back_list = [], []
-        for i in range(0, len(flow_imgs_fwd)):
-            flow_imgs_fwd_list.append(flow_imgs_fwd[i].to(device))
-            flow_imgs_back_list.append(flow_imgs_back[i].to(device))
-        flow_imgs = [flow_imgs_fwd_list, flow_imgs_back_list]
-    else:
-        flow_imgs = [[None for i in range(0,len(source_img_list))] for i in range(0,2)] #annoying but necessary
-
-
-    intrinsics_aug = intrinsics['color_aug_left'].type(torch.FloatTensor).to(device)[:,0,:,:] #only need one matrix since it's constant across the training sample
-    intrinsics = intrinsics['color_left'].type(torch.FloatTensor).to(device)[:,0,:,:]
-    return target_img, source_img_list, gt_lie_alg_list, vo_lie_alg_list, flow_imgs, intrinsics, \
-            target_img_aug, source_img_aug_list, gt_lie_alg_aug_list, vo_lie_alg_aug_list, intrinsics_aug
-
 class KittiLoaderPytorch(torch.utils.data.Dataset):
     """Loads the KITTI Odometry Benchmark Dataset"""
-    def __init__(self, config, seq, mode='train', transform_img=None, augment=False, skip=None, stereo_imgs=False):
+    def __init__(self, config, seq, mode='train', transform_img=None, augment=False, stereo_imgs=False):
         """
         Args:
             config file 
             desired sequences
             this works for KITTI and robotcar
         """
-        seq_names= {'00': '2011_10_03_drive_0027_sync',
-                '01': '2011_10_03_drive_0042_sync',
-                '02': '2011_10_03_drive_0034_sync',
-                '04': '2011_09_30_drive_0016_sync',
-                '05': '2011_09_30_drive_0018_sync',
-                '06': '2011_09_30_drive_0020_sync',
-                '07': '2011_09_30_drive_0027_sync',
-                '08': '2011_09_30_drive_0028_sync',
-                '09': '2011_09_30_drive_0033_sync',
-                '10': '2011_09_30_drive_0034_sync',
-                '11': '11',
-                '12': '12',
-                '13': '13',
-                '14': '14',
-                '15': '15',
-                '16': '16',
-                '17': '17',
-                '18': '18',
-                '19': '19',
-                '20': '20',
-                '21': '21',
+        seq_names= {'00_02': '2011_10_03_drive_0027_sync_02', '00_03': '2011_10_03_drive_0027_sync_03',
+                '01_02': '2011_10_03_drive_0042_sync_02', '01_03': '2011_10_03_drive_0042_sync_03',
+                '02_02': '2011_10_03_drive_0034_sync_02', '02_03': '2011_10_03_drive_0034_sync_03',
+                '04_02': '2011_09_30_drive_0016_sync_02', '04_03': '2011_09_30_drive_0016_sync_03',
+                '05_02': '2011_09_30_drive_0018_sync_02', '05_03': '2011_09_30_drive_0018_sync_03',
+                '06_02': '2011_09_30_drive_0020_sync_02', '06_03': '2011_09_30_drive_0020_sync_03',
+                '07_02': '2011_09_30_drive_0027_sync_02', '07_03': '2011_09_30_drive_0027_sync_03',
+                '08_02': '2011_09_30_drive_0028_sync_02', '08_03': '2011_09_30_drive_0028_sync_03',
+                '09_02': '2011_09_30_drive_0033_sync_02', '09_03': '2011_09_30_drive_0033_sync_03',
+                '10_02': '2011_09_30_drive_0034_sync_02','10_03': '2011_09_30_drive_0034_sync_03',
+                '11_02': '11_02', '11_03': '11_03',
+                '12_02': '12_02', '12_03': '12_03',
+                '13_02': '13_02', '13_03': '13_03',
+                '14_02': '14_02', '14_03': '14_03',
+                '15_02': '15_02', '15_03': '15_03',
+                '16_02': '16_02', '16_03': '16_03',
+                '17_02': '17_02', '17_03': '17_03',
+                '18_02': '18_02', '18_03': '18_03',
+                '19_02': '19_02', '19_03': '19_03',
+                '20_02': '20_02', '20_03': '20_03',
+                '21_02': '21_02', '21_03': '21_03',
                 '2014-11-18-13-20-12_0': '2014-11-18-13-20-12_0', '2014-11-18-13-20-12_1': '2014-11-18-13-20-12_1', '2014-11-18-13-20-12_2': '2014-11-18-13-20-12_2', '2014-11-18-13-20-12_3': '2014-11-18-13-20-12_3',
                 '2015-07-08-13-37-17_0': '2015-07-08-13-37-17_0', '2015-07-08-13-37-17_1': '2015-07-08-13-37-17_1', '2015-07-08-13-37-17_2': '2015-07-08-13-37-17_2', '2015-07-08-13-37-17_3': '2015-07-08-13-37-17_3', '2015-07-08-13-37-17_4': '2015-07-08-13-37-17_4', '2015-07-08-13-37-17_5': '2015-07-08-13-37-17_5',
                 '2015-07-10-10-01-59_0': '2015-07-10-10-01-59_0', '2015-07-10-10-01-59_1': '2015-07-10-10-01-59_1', '2015-07-10-10-01-59_2': '2015-07-10-10-01-59_2', '2015-07-10-10-01-59_3': '2015-07-10-10-01-59_3', '2015-07-10-10-01-59_4': '2015-07-10-10-01-59_4', 
                 '2015-08-12-15-04-18_0': '2015-08-12-15-04-18_0', '2015-08-12-15-04-18_1': '2015-08-12-15-04-18_1', '2015-08-12-15-04-18_2': '2015-08-12-15-04-18_2', '2015-08-12-15-04-18_3': '2015-08-12-15-04-18_3', '2015-08-12-15-04-18_4': '2015-08-12-15-04-18_4', 
+
                 }
 
         self.config = config
@@ -139,9 +60,9 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
         self.transform_img = transform_img
         self.num_frames = config['num_frames']
         self.augment = augment
-        self.skip = skip
+        self.skip = config['skip']
         self.stereo_imgs = stereo_imgs
-        self.load_stereo = config['load_stereo']
+        # self.load_stereo = config['load_stereo']
 
             ###Iterate through all specified KITTI sequences and extract raw data, and trajectories
         self.left_cam_filenames = []
@@ -153,6 +74,7 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
         self.raw_ts = []
         train_seq, val_seq, test_seq = seq
         if train_seq == ['all'] and mode == 'train':
+            print(val_seq, test_seq)
             seq = []
             seq_name={}
             
@@ -183,12 +105,12 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             seq = test_seq
 
         for s,i in zip(seq,range(0,len(seq))):
+            print(s)
+            print(os.path.join(basedir, seq_name[s],'{}_data_{}.mat'.format(config['estimator_type'], config['estimator'])))
             data = sio.loadmat(os.path.join(basedir, seq_name[s],'{}_data_{}.mat'.format(config['estimator_type'], config['estimator'])))
             
             self.left_cam_filenames.append(np.copy(data['cam_02'].reshape((-1,1))))
-            self.right_cam_filenames.append(np.copy(data['cam_03'].reshape((-1,1))))
             self.raw_intrinsic_trials_left.append(np.copy(data['intrinsics_left']))
-            self.raw_intrinsic_trials_right.append(np.copy(data['intrinsics_right']))
             self.raw_gt_trials.append(np.copy(data['sparse_gt_pose']))
             self.raw_vo_traj.append(np.copy(data['sparse_vo']))
             self.raw_ts.append(np.copy(data['ts'].reshape((-1))))
@@ -197,9 +119,7 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             if self.config['correction_rate'] != 1:
                 cr = self.config['correction_rate']
                 self.left_cam_filenames[i] = np.copy(self.left_cam_filenames[i][::cr])
-                self.right_cam_filenames[i] = np.copy(self.right_cam_filenames[i][::cr])
                 self.raw_intrinsic_trials_left[i] = np.copy(self.raw_intrinsic_trials_left[i][::cr])
-                self.raw_intrinsic_trials_right[i] = np.copy(self.raw_intrinsic_trials_right[i][::cr])
                 self.raw_gt_trials[i] = np.copy(self.raw_gt_trials[i][::cr])
                 self.raw_vo_traj[i] = np.copy(self.raw_vo_traj[i][::cr])
                 self.raw_ts[i] = np.copy(self.raw_ts[i][::cr])
@@ -208,9 +128,7 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             
             if self.num_frames:
                 self.left_cam_filenames[i] = np.copy(self.left_cam_filenames[i][:self.num_frames])
-                self.right_cam_filenames[i] = np.copy(self.right_cam_filenames[i][:self.num_frames])
                 self.raw_intrinsic_trials_left[i] = np.copy(self.raw_intrinsic_trials_left[i][:self.num_frames])
-                self.raw_intrinsic_trials_right[i] = np.copy(self.raw_intrinsic_trials_right[i][:self.num_frames])
                 self.raw_gt_trials[i] = np.copy(self.raw_gt_trials[i][:self.num_frames])
                 self.raw_vo_traj[i] = np.copy(self.raw_vo_traj[i][:self.num_frames])  
                 self.raw_ts[i] = np.copy(self.raw_ts[i][:self.num_frames])      
@@ -222,23 +140,19 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
                 for s, i in zip(seq, range(0,len(seq))):
                     data = sio.loadmat(os.path.join(basedir, seq_name[s],'{}_data_{}.mat'.format(config['estimator_type'], config['estimator'])))
                     self.left_cam_filenames.append(np.copy(data['cam_02'].reshape((-1,1)))[::(cr+skip_idx)])
-                    self.right_cam_filenames.append(np.copy(data['cam_03'].reshape((-1,1)))[::(cr+skip_idx)])
                     self.raw_intrinsic_trials_left.append(np.copy(data['intrinsics_left'])[::(cr+skip_idx)])
-                    self.raw_intrinsic_trials_right.append(np.copy(data['intrinsics_right'])[::(cr+skip_idx)])
                     self.raw_gt_trials.append(np.copy(data['sparse_gt_pose'])[::(cr+skip_idx)])
                     self.raw_vo_traj.append(np.copy(data['sparse_vo'])[::(cr+skip_idx)])
                     self.raw_ts.append(np.copy(data['ts'])[::(cr+skip_idx)])
          
 
 ###         Merge data from all trials   
-        self.gt_samples, self.left_img_samples, self.right_img_samples, self.intrinsic_samples_left, self.intrinsic_samples_right, \
-            self.vo_samples, self.ts_samples = self.reshape_data()
+        self.gt_samples, self.left_img_samples, self.intrinsic_samples_left, self.vo_samples, self.ts_samples = self.reshape_data()
 
         if self.skip:
             skip = self.config['skip']
-            self.gt_samples, self.left_img_samples, self.intrinsic_samples_left, self.intrinsic_samples_right = self.gt_samples[::skip], self.left_img_samples[::skip], self.intrinsic_samples_left[::skip], self.intrinsic_samples_right[::skip]
+            self.gt_samples, self.left_img_samples, self.intrinsic_samples_left, = self.gt_samples[::skip], self.left_img_samples[::skip], self.intrinsic_samples_left[::skip]
             self.vo_samples = self.vo_samples[::skip]
-            self.right_img_samples = self.right_img_samples[::skip]
             self.ts_samples = self.ts_samples[::skip]
         
         print('length',len(self.gt_samples))
@@ -255,19 +169,7 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
         imgs = list(imgs_left)
         intrinsics = self.intrinsic_samples_left[idx] 
 
-        if self.load_stereo:
-            imgs_left = imgs
-            intrinsics_left = intrinsics
-            imgs_right = []
-            
-            for i in range(0,self.seq_len):
-                imgs_right.append(self.load_image(self.right_img_samples[idx,i]))     
-        
-            imgs_right = list(imgs_right)
-            intrinsics_right = self.intrinsic_samples_right[idx]
-            imgs = imgs_left + imgs_right
-            intrinsics = np.vstack((intrinsics_left, intrinsics_right))
-            
+
         target_idx = int(len(imgs_left)/2)   
         source_idx = list(range(0,self.seq_len))
         source_idx.pop(target_idx)             
@@ -278,9 +180,9 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             lie_alg.append(list(self.compute_target(idx,target_idx, source_idx[i])))    
             transformed_lie_alg.append(list(self.compute_target(idx,target_idx, source_idx[i])))   
         
-        if self.load_stereo:
-            lie_alg = lie_alg+lie_alg
-            transformed_lie_alg = transformed_lie_alg + transformed_lie_alg #make 2 copies for transforms    
+        # if self.load_stereo:
+        #     lie_alg = lie_alg+lie_alg
+        #     transformed_lie_alg = transformed_lie_alg + transformed_lie_alg #make 2 copies for transforms    
         
         if self.transform_img != None:
             orig, transformed = self.transform_img((imgs, intrinsics, lie_alg), (imgs, intrinsics, transformed_lie_alg)) 
@@ -302,18 +204,11 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
                 flow_imgs_fwd.append(flow_img_back) 
                 flow_imgs_back.append(flow_img_fwd)     
             
-        target_im = {'color_left': orig_imgs[0:self.seq_len][target_idx], 'color_aug_left': transformed_imgs[0:self.seq_len][target_idx] }
+        target_im = {'color_left': orig_imgs[0:self.seq_len][target_idx], 'color_aug_left': transformed_imgs[0:self.seq_len][target_idx]}
         source_imgs = {'color_left': [orig_imgs[0:self.seq_len][i] for i in source_idx], 'color_aug_left': [transformed_imgs[0:self.seq_len][i] for i in source_idx] }
         intrinsics = {'color_left': orig_intrinsics[0:self.seq_len], 'color_aug_left': transformed_intrinsics[0:self.seq_len]}
         lie_alg = {'color': orig_lie_alg[0:self.seq_len], 'color_aug': transformed_lie_alg[0:self.seq_len]}        
-        if self.load_stereo:
-            target_im['color_right'] = orig_imgs[self.seq_len:][target_idx]
-            target_im['color_aug_right'] = transformed_imgs[self.seq_len:][target_idx]
-            source_imgs['color_right'] = [orig_imgs[self.seq_len:][i] for i in source_idx]
-            source_imgs['color_aug_right'] = [transformed_imgs[self.seq_len:][i] for i in source_idx]
-            intrinsics['color_right'] = orig_intrinsics[self.seq_len:]
-            intrinsics['color_aug_right'] = transformed_intrinsics[self.seq_len:]
-        
+
         return target_im, source_imgs, lie_alg, intrinsics, (flow_imgs_fwd, flow_imgs_back)
 
 
@@ -353,9 +248,9 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
         gt_samples = self.raw_gt_trials[0][0:self.seq_len,:,:].reshape((1,self.seq_len,4,4))
         vo_samples = self.raw_vo_traj[0][0:self.seq_len,:,:].reshape((1,self.seq_len,4,4))
         intrinsic_samples_left = self.raw_intrinsic_trials_left[0][0:self.seq_len,:,:].reshape((1,self.seq_len,3,3))
-        intrinsic_samples_right = self.raw_intrinsic_trials_right[0][0:self.seq_len,:,:].reshape((1,self.seq_len,3,3))
+        # intrinsic_samples_right = self.raw_intrinsic_trials_right[0][0:self.seq_len,:,:].reshape((1,self.seq_len,3,3))
         left_img_samples = self.left_cam_filenames[0][0:self.seq_len].reshape((1,self.seq_len,1))
-        right_img_samples = self.right_cam_filenames[0][0:self.seq_len].reshape((1,self.seq_len,1))
+        # right_img_samples = self.right_cam_filenames[0][0:self.seq_len].reshape((1,self.seq_len,1))
         ts_samples = self.raw_ts[0][0:self.seq_len].reshape((1,self.seq_len,1))
         pose_per_sample = []
 
@@ -384,14 +279,6 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             new_intrins = new_intrins.reshape((-1,self.seq_len,3,3))
             intrinsic_samples_left = np.vstack((intrinsic_samples_left, new_intrins))
             
-        for intrins_r in self.raw_intrinsic_trials_right:
-            intrins_r = intrins_r.reshape((-1,intrins_r.shape[1]*intrins_r.shape[2]))
-            if self.samples_per_file == None:
-                num_samples = int(intrins_r.shape[0]/(self.seq_len))
-            new_intrins = self.split_data(intrins_r, num_samples, self.seq_len)
-            new_intrins = new_intrins.reshape((-1,self.seq_len,3,3))
-            intrinsic_samples_right = np.vstack((intrinsic_samples_right, new_intrins))   
-                 
         count = 0
         for im in self.left_cam_filenames:
             im = im.reshape((-1,1))
@@ -399,15 +286,6 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
                 num_samples = int(im.shape[0]/(self.seq_len))
             new_imgs = self.split_data(im, num_samples, self.seq_len)
             left_img_samples = np.vstack((left_img_samples, new_imgs[0:pose_per_sample[count]])) #get rid of extra imgs due to rounding of gt
-            count +=1
-
-        count = 0
-        for im in self.right_cam_filenames:
-            im = im.reshape((-1,1))
-            if self.samples_per_file == None:
-                num_samples = int(im.shape[0]/(self.seq_len))
-            new_imgs = self.split_data(im, num_samples, self.seq_len)
-            right_img_samples = np.vstack((right_img_samples, new_imgs[0:pose_per_sample[count]])) #get rid of extra imgs due to rounding of gt
             count +=1
 
         count = 0
@@ -421,14 +299,13 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
            
         gt_samples = gt_samples[1:]
         intrinsic_samples_left = intrinsic_samples_left[1:]
-        intrinsic_samples_right = intrinsic_samples_right[1:]
+        # intrinsic_samples_right = intrinsic_samples_right[1:]
         left_img_samples = left_img_samples[1:]
-        right_img_samples = right_img_samples[1:]
+        # right_img_samples = right_img_samples[1:]
         vo_samples = vo_samples[1:]
         ts_samples = ts_samples[1:]
 
-        return gt_samples, left_img_samples, right_img_samples, intrinsic_samples_left, intrinsic_samples_right, vo_samples, \
-            ts_samples
+        return gt_samples, left_img_samples, intrinsic_samples_left, vo_samples, ts_samples
 
         
     def split_data(self, data, num_samples,sample_size):

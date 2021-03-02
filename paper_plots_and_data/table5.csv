@@ -1,6 +1,0 @@
-Method,Sequence
- ,09_02, ,10_02, 
- ,mse-trans (%),mse-rot (deg/100m),mse-trans (%),mse-rot (deg/100m)
-Original,34.51,9.23,36.38,12.01
-Retrained (unscaled),34.99,2.25,32.53,3.45
-Retrained (scaled),6.93,1.70,8.82,3.54

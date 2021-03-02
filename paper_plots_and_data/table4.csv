@@ -1,6 +1,0 @@
-Method,Sequence
- ,09_02, ,10_02, 
- ,mse-trans (%),mse-rot (deg/100m),mse-trans (%),mse-rot (deg/100m)
-Unscaled,38.91,1.91,36.88,4.07
-Scaled (online),7.23,1.91,13.98,4.07
-Scaled (ours),5.93,1.67,10.54,4.03

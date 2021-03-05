@@ -43,7 +43,6 @@ with open('scale_variance_full.csv', "w") as f:
             results_dir = dir + '/results/scale/'
             config = load_obj('{}/config'.format(dir))
             config['test_seq'] = [seq]
-            config['data_dir'] = path_to_dset_downsized+config['img_resolution'] + '_res/' #if grabbed from obelisk
 
             test_dset_loaders, _, _ = data_and_model_loader(config, None, None, seq=seq)
 

@@ -7,7 +7,7 @@
 **.jpg
 **.png
 !data/loss-diagram.png
-!results/initial-posenet/**
+!results/initial-posenet
 **.tgn
 runs/**
 results/**

@@ -7,7 +7,6 @@
 **.jpg
 **.png
 !data/loss-diagram.png
-!results/initial-posenet
 **.tgn
 runs/**
 results/**
@@ -17,3 +16,9 @@ paper_plots_and_data/compare_and_plot_scale.py
 paper_plots_and_data/plot_scale_factor_training.py
 paper_plots_and_data/evaluate_ATE/pose_data/*
 data/create_kitti_odometry_data.py
+
+
+!results/initial-posenet/2021-3-2-18-6-pose-best-loss-val_seq-05-test_seq-09.pth
+!results/initial-posenet/2021-3-2-18-6-results-val_seq-05-test_seq-09.pkl
+!results/initial-posenet/config.pkl
+!results/initial-posenet/config.txt

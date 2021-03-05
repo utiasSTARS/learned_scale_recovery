@@ -9,7 +9,10 @@
 !data/loss-diagram.png
 **.tgn
 runs/**
-results/**
+results/final_models/*
+results/plane-model-eigen-202101201842/*
+results/plane-model-kitti-202101072240/*
+results/plane-model-oxford-202102092331/*
 data/orbslam-estimates/ground_truth/*
 data/orbslam-estimates/orbslam_mono_traj/*
 paper_plots_and_data/compare_and_plot_scale.py

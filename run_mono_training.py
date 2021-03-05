@@ -76,11 +76,15 @@ parser.add_argument('--l_gt_supervised_weight', type=float, default=30) #60
 # parser.add_argument('--l_left_right_consist', action='store_true', default=False, help='stereo loss (reproject left image to right) to resolve metric scale') 
 # parser.add_argument('--l_left_right_consist_weight', type=float, default=0.4)
  
-parser.add_argument('--load_pretrained_depth', action='store_true', default=True, help= 'Use an existing depth model')
+'''
+'results/initial-posenet' contains partially trained egomotion network weights
+make sure to load this network if training a model from scratch.
+This is not a required step, but is recommended to guarantee proper initialization of the networks.
+Otherwise, just load the pretrained oxford robotcar model prior to training on KITTI.
 
-## make sure to load the pretrained pose from 'results/initial-posenet' if training a model from scratch - required for better convergence
-## 'results/initial-posenet' features an egomotion network trained for short duration using orbslam estimates as pose labels.
+'''
 parser.add_argument('--load_pretrained_pose', action='store_true', default=True, help= 'Use an existing pose model')
+parser.add_argument('--load_pretrained_depth', action='store_true', default=True, help= 'Use an existing depth model')
 parser.add_argument('--pretrained_dir', type=str, default='results/final_models/vo-oxford-unscaled-202102092331')      
 parser.add_argument('--pretrained_plane_dir', type=str, default='')   #'results/plane-model-med-res-oxford',    
         

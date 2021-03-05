@@ -15,7 +15,6 @@ results/plane-model-kitti-202101072240/*
 results/plane-model-oxford-202102092331/*
 data/orbslam-estimates/ground_truth/*
 data/orbslam-estimates/orbslam_mono_traj/*
-paper_plots_and_data/compare_and_plot_scale.py
 paper_plots_and_data/plot_scale_factor_training.py
 paper_plots_and_data/evaluate_ATE/pose_data/*
 data/create_kitti_odometry_data.py

@@ -16,7 +16,8 @@ matplotlib.use('Agg', warn=False)
 
 path_to_ws = '/home/brandonwagstaff/learned_scale_recovery/'
 path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
-seq_list = ['00_02', '02_02', '06_02', '07_02', '08_02', '05_02', '09_02', '10_02'] 
+# seq_list = ['00_02', '02_02', '06_02', '07_02', '08_02', '05_02', '09_02', '10_02'] 
+seq_list = ['05_02', '09_02', '10_02'] 
 method_list = ['scaled', 'unscaled']
 
 dir_list = [path_to_ws+'results/final_models/vo-kitti-scaled-202102182020', \
@@ -25,13 +26,13 @@ dir_list = [path_to_ws+'results/final_models/vo-kitti-scaled-202102182020', \
 
 
 csv_header1 = ['Method', 'Sequence']
-csv_header2 = ['', 'Train', '', '', '','', 'Val', 'Test']
+# csv_header2 = ['', 'Train', '', '', '','', 'Val', 'Test']
 csv_header3 = [''] + seq_list + ['Mean']
 
 with open('scale_variance_full.csv', "w") as f:
     writer = csv.writer(f)
     writer.writerow(csv_header1)
-    writer.writerow(csv_header2)
+    # writer.writerow(csv_header2)
     writer.writerow(csv_header3)
     
     scale_factors = {}
@@ -43,12 +44,7 @@ with open('scale_variance_full.csv', "w") as f:
             config = load_obj('{}/config'.format(dir))
             config['test_seq'] = [seq]
             config['data_dir'] = path_to_dset_downsized+config['img_resolution'] + '_res/' #if grabbed from obelisk
-            dpc = config['dpc']
-            mode = config['pose_output_type']
-            if dpc:
-                prefix = 'dpc'
-            else:
-                prefix=''
+
             test_dset_loaders, _, _ = data_and_model_loader(config, None, None, seq=seq)
 
             data = load_obj('{}/{}_plane_fit'.format(results_dir, config['test_seq'][0]))
@@ -57,11 +53,6 @@ with open('scale_variance_full.csv', "w") as f:
             fwd_pose_vec1 = data['fwd_pose_vec1']
             inv_pose_vec1 = data['inv_pose_vec1']
             gt_pose_vec = data['gt_pose_vec']
-
-            if config['dpc'] == False:
-                prefix = ''
-            if config['dpc'] == True:
-                prefix = prefix = 'dpc-'
 
             scale_factor = data['learned_scale_factor']
             scale_factor_mean = np.average(scale_factor)

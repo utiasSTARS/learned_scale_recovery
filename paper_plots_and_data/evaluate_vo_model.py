@@ -23,11 +23,11 @@ path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
 load_from_mat = False #Make True to load paper results rather than recomputing
 plane_rescaling = True
 dnet_rescaling = True
-ransac_rescaling = False
+ransac_rescaling = True
 # seq_list = ['00_02', '02_02', '06_02', '07_02', '08_02', '05_02', '09_02', '10_02']
-seq_list = ['05_02', '09_02', '10_02']
+seq_list =['09_02', '10_02']
 
-dir = path_to_ws + 'results/final_models/vo-kitti-scaled-202102182020' 
+dir = path_to_ws + 'results/final_models/vo-kitti-scaled-202102182020'
 plane_dir = 'results/plane-model-kitti-202101072240'
 results_dir = dir + '/results/scale/'
 os.makedirs(results_dir, exist_ok=True)
@@ -252,8 +252,6 @@ for seq in seq_list:
         print('ground plane std. dev. scale factor (dnet): {}'.format(np.std(data['dnet_scale_factor'])))
         scaled_pose_vec_dnet = np.array(unscaled_pose_vec)
         scaled_pose_vec_dnet[:,0:3] = scaled_pose_vec_dnet[:,0:3]*np.repeat(data['dnet_scale_factor'],3,axis=1)
-        
-
 
     ## Scale Factor
     gt_norm = np.linalg.norm(gt_pose_vec[:,0:3],axis=1)
@@ -297,4 +295,3 @@ for seq in seq_list:
     plt.legend()
     plt.title('Topdown (XY) Trajectory Seq. {}'.format(seq.replace('_','-')))
     plt.savefig('{}/seq-{}-topdown-scaled.png'.format(results_dir, seq))
-

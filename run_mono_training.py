@@ -26,20 +26,21 @@ parser = argparse.ArgumentParser(description='training arguments.')
 parser.add_argument('--estimator', type=str, default='libviso2') #libviso2 or orbslam
 parser.add_argument('--estimator_type', type=str, default='mono') #mono or stereo
 parser.add_argument('--flow_type', type=str, default='none', help='classical, or none')
-#parser.add_argument('--load_stereo', action='store_true', default=False) #currently not implemented for left/right consist
+# parser.add_argument('--load_stereo', action='store_true', default=False) #currently not implemented for left/right consist
 parser.add_argument('--stereo_baseline', type=float, default=0.52)
 parser.add_argument('--num_scales', type=int, default=1)
 parser.add_argument('--img_resolution', type=str, default='med') # low (128x445) med (192 x640) or high (256 x 832) 
-parser.add_argument('--img_per_sample', type=int, default=3) #1 target image, and rest are source images 
+parser.add_argument('--img_per_sample', type=int, default=3) #1 target image, and rest are source images - currently fixed at 3
 
 '''Training Arguments'''
-parser.add_argument('--data_dir', type=str, default='/media/m2-drive/datasets/KITTI-downsized')
+parser.add_argument('--data_dir', type=str, default='/media/m2-drive/datasets/KITTI-downsized-stereo')
 parser.add_argument('--data_format', type=str, default='odometry') #odmetry or eigen
 parser.add_argument('--date', type=str, default='0000000')
 parser.add_argument('--train_seq', nargs='+', type=str, default=['00_02', '02_02'])
 parser.add_argument('--val_seq', nargs='+',type=str, default=['05_02'])
 parser.add_argument('--test_seq', nargs='+', type=str, default=['09_02'])
 parser.add_argument('--augment_motion', action='store_true', default=False)
+parser.add_argument('--minibatch', type=float, default=6) #60
 parser.add_argument('--wd', type=float, default=0)
 parser.add_argument('--lr', type=float, default=9e-4)
 parser.add_argument('--num_epochs', type=int, default=20)
@@ -59,11 +60,11 @@ parser.add_argument('--l_pose_consist', action='store_true', default=True, help=
 parser.add_argument('--l_pose_consist_weight', type=float, default=5)
 parser.add_argument('--l_inverse', action='store_true', default=True, help='reproject target image to source images as well')
 parser.add_argument('--l_depth_consist', action='store_true', default=True, help='Depth consistency loss from https://arxiv.org/pdf/1908.10553.pdf')
-parser.add_argument('--l_depth_consist_weight', type=float, default=0.14) #0.14
+parser.add_argument('--l_depth_consist_weight', type=float, default=0.14) 
 parser.add_argument('--with_depth_mask', action='store_true', default=True, help='with the depth consistency mask for moving objects and occlusions or not')
 parser.add_argument('--l_scale_recovery', action='store_true', default=True, help='enforces metric scale consistency')
-parser.add_argument('--l_scale_depth_weight', type=float, default=0.02) #0.02
-parser.add_argument('--l_scale_pose_weight', type=float, default=0.6) # 0.6 for initial,  or 6
+parser.add_argument('--l_scale_depth_weight', type=float, default=0.02) 
+parser.add_argument('--l_scale_pose_weight', type=float, default=0.6) 
 parser.add_argument('--camera_height', type=float, default=1.70) #1.52 for oxford, 1.70 for KITTI
 parser.add_argument('--l_smooth', action='store_true', default=True)
 parser.add_argument('--l_smooth_weight', type=float, default=0.05) #0.15
@@ -75,9 +76,12 @@ parser.add_argument('--l_gt_supervised_weight', type=float, default=30) #60
 # parser.add_argument('--l_left_right_consist', action='store_true', default=False, help='stereo loss (reproject left image to right) to resolve metric scale') 
 # parser.add_argument('--l_left_right_consist_weight', type=float, default=0.4)
  
-parser.add_argument('--load_pretrained_depth', action='store_true', default=False, help= 'Use an existing depth model')
+parser.add_argument('--load_pretrained_depth', action='store_true', default=True, help= 'Use an existing depth model')
+
+## make sure to load the pretrained pose from 'results/initial-posenet' if training a model from scratch - required for better convergence
+## 'results/initial-posenet' features an egomotion network trained for short duration using orbslam estimates as pose labels.
 parser.add_argument('--load_pretrained_pose', action='store_true', default=True, help= 'Use an existing pose model')
-parser.add_argument('--pretrained_dir', type=str, default='results/202103011655')      
+parser.add_argument('--pretrained_dir', type=str, default='results/final_models/vo-oxford-unscaled-202102092331')      
 parser.add_argument('--pretrained_plane_dir', type=str, default='')   #'results/plane-model-med-res-oxford',    
         
 args = parser.parse_args()
@@ -85,7 +89,6 @@ config={
     'num_frames': None,
     'skip':1,    ### if not one, we skip every 'skip' samples that are generated ({1,2}, {2,3}, {3,4} becomes {1,2}, {3,4})
     'correction_rate': 1, ### if not one, only perform corrections every 'correction_rate' frames (samples become {1,3},{3,5},{5,7} when 2)
-    'minibatch':6,      ##minibatch size      
     'freeze_posenet': False,
     'freeze_depthnet': False,
     }
@@ -98,7 +101,7 @@ config['data_dir'] = '{}/{}_res'.format(config['data_dir'], config['img_resoluti
 if args.data_format == 'odometry':
 
     # if args.load_stereo == True:
-    #     from data.kitti_loader import KittiLoaderPytorch # loads left and right images for each sample
+    # from data.kitti_loader import KittiLoaderPytorch # loads left and right images for each sample
     # else:
     from data.kitti_loader_stereo import KittiLoaderPytorch #loads left and right images as separate sequences
 
@@ -136,10 +139,12 @@ def main():
     pretrained_depth_path, pretrained_pose_path = None, None
     if config['load_pretrained_depth']:
         pretrained_depth_path = glob.glob('{}/**depth**best-loss-val_seq-**-test_seq-**.pth'.format(config['pretrained_dir']))[0]
+    if config['load_pretrained_pose']:
+        pretrained_pose_path = glob.glob('{}/**pose**best-loss-val_seq-**-test_seq-**.pth'.format(config['pretrained_dir']))[0]    
     
-    if config['load_pretrained_pose']: ## skip epoch 0 if pose model is pretrained (epoch 0 initializes with VO)
+    
+    if config['load_pretrained_pose']==True and config['load_pretrained_depth']==True: ## skip epoch 0 if pose model is pretrained (epoch 0 initializes with VO)
         epochs = range(1,config['num_epochs'])
-        pretrained_pose_path = glob.glob('{}/**pose**best-loss-val_seq-**-test_seq-**.pth'.format(config['pretrained_dir']))[0]
     else:
         epochs = range(0,config['num_epochs'])
     

@@ -16,9 +16,10 @@ path_to_ws = '/home/brandonwagstaff/learned_scale_recovery/'
 path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
 
 seq_list = ['09_02', '10_02'] 
-method_list = ['Original', 'Retrained (unscaled)', 'Retrained (scaled)']
+method_list = ['Original', 'Retrained (unscaled)', 'Retrained (unscaled w dnet rescaling)', 'Retrained (scaled)']
 
 dir_list = [path_to_ws+'results/final_models/vo-oxford-scaled-202102102305', \
+    path_to_ws+'results/final_models/retraining_exp_ox-to-kitti-unscaled-202102161332', \
     path_to_ws+'results/final_models/retraining_exp_ox-to-kitti-unscaled-202102161332', \
     path_to_ws+'results/final_models/retraining_exp_ox-to-kitti-scaled-202102181710', 
      ]
@@ -73,7 +74,11 @@ with open(table_filename, "w") as f:
 
             ## Compute Trajectories
             gt_traj = test_dset_loaders.dataset.raw_gt_trials[0]
-            est, gt, errors, cum_dist = tt(unscaled_pose_vec,gt_traj,method=method)
+    
+            if method == 'Retrained (unscaled w dnet rescaling)':
+                est, gt, errors, cum_dist = tt(scaled_pose_vec,gt_traj,method=method)
+            else:
+                est, gt, errors, cum_dist = tt(unscaled_pose_vec,gt_traj,method=method)
             seq_results.append(errors[2])
             seq_results.append(errors[3])
             

@@ -16,7 +16,7 @@ Accompanying code for 'Self-Supervised Scale Recovery for Monocular Depth and Eg
 
 # Datasets
 
-We trained and tested on the KITTI dataset. Download the raw dataset [here](http://www.cvlibs.net/datasets/kitti/raw_data.php). We provide a dataloader, but we first require that the data be preprocessed. To do so, run `create_kitti_odometry_data.py` within the `data` directory (be sure to specify the source and target directory). 
+We trained and tested on the KITTI dataset. Download the raw dataset [here](http://www.cvlibs.net/datasets/kitti/raw_data.php). We provide a dataloader, but we first require that the data be preprocessed. To do so, run `create_kitti_odometry_data_w_stereo.py` within the `data` directory (be sure to specify the source and target directory). For training with the Eigen split, first run `create_kitti_eigen_data.py`.
 
 For Oxford Robotcar training, we downloaded sequences using the [dataset scraper](https://github.com/mttgdd/RobotCarDataset-Scraper). Once downloaded, the data can be preprocessed by running `synchronize_gt_with_imgs.py` in `data/oxford`, followed by `create_oxford_data.py` within the `data` directory (be sure to specify the source and target directory).
 
@@ -28,7 +28,7 @@ Our pretrained models are available online. To download them, run the following 
 bash download_data.sh
 ```
 
-This will populate the results directory with the appropriate models we trained for our experiments. Run `evaluate_model.py` within the `paper_plots_and_data` directory to evaluate a specific model on any desired sequence. This will save a `.pkl` file with the results. To compare multiple models, see `compare_methods.py` (for table II), `compare_and_plot_scale.py` (for table III), and `compare_retraining_methods.py` (for table IV). For plotting, run any of the `plot*.py` scripts. `generate_video_imgs.py` will store a sequence of depth and plane segmentation images within the `video` directory.
+This will populate the results directory with the appropriate models we trained for our experiments. Run `evaluate_vo_model.py` within the `paper_plots_and_data` directory to evaluate a specific model on any desired sequence. This will save a `.pkl` file with VO and scale factor estimation results for our method, and for our DNet rescaling implementation. We provide precomputed results stored in the provided model directories. To generate some of the primary paper results, see `evaluate_depth_eigen.py` for our results from Table 3, `generate_table4.py`, and `generate_table5.py`. For plotting, run `plot_traj.py` to produce top-down views of the trajectory estimages, or `compare_and_plot_scale.py` to plot the scale factor estimates. `generate_video_imgs.py` will store a sequence of depth and plane segmentation images within the `video` directory.
 
 
 # Training
@@ -38,6 +38,6 @@ Two bash scripts are provided that will run the training experiments (for Depth 
 `run_mono_exps_kitti.sh`
 `run_mono_exps_oxford.sh`
 
-Prior to training, the data directory should be modified accordingly to point to the processed KITTI data. During training, to visualize the training procedure, open a tensorboard from the main directory:
+Prior to training, the data directory should be modified accordingly to point to the processed KITTI data. During training, to visualize some results during the training procedure, open a tensorboard from the main directory:
 
 `tensorboard --logdir runs` 

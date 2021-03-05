@@ -15,7 +15,7 @@ path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
 dir = 'results/final_models/vo-kitti-scaled-202102182020' #'results/202007111233-kitti-scaled-good'
 plane_dir = 'results/plane-model-kitti-202101072240'
 
-seq_list = ['10_02']
+seq_list = ['09_02', '10_02']
 
 plot_imgs = True
 plot_img_arrays = False

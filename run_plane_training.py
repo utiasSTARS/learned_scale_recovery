@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(description='training arguments.')
 
 '''System Options'''
 parser.add_argument('--pretrained_dir', type=str, default='')  
+parser.add_argument('--data_dir', type=str, default='/media/m2-drive/datasets/KITTI-downsized-stereo')
 parser.add_argument('--date', type=str, default='0000000')
 parser.add_argument('--lr', type=float, default=9e-4)
 parser.add_argument('--num_epochs', type=int, default=20)

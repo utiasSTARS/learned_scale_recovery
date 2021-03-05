@@ -35,7 +35,7 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
         self.augment = augment
         self.skip = skip
         self.stereo_imgs = stereo_imgs
-        self.load_stereo = config['load_stereo']
+        # self.load_stereo = config['load_stereo']
         self.raw_gt_trials = [np.zeros(10)]
 
             ###Iterate through all specified KITTI sequences and extract raw data, and trajectories
@@ -68,9 +68,9 @@ class KittiLoaderPytorch(torch.utils.data.Dataset):
             lie_alg.append(list(self.compute_target(poses, target_idx, source_idx[i])))    
             transformed_lie_alg.append(list(self.compute_target(poses, target_idx, source_idx[i])))   
         
-        if self.load_stereo:
-            lie_alg = lie_alg+lie_alg
-            transformed_lie_alg = transformed_lie_alg + transformed_lie_alg #make 2 copies for transforms    
+        # if self.load_stereo:
+        #     lie_alg = lie_alg+lie_alg
+        #     transformed_lie_alg = transformed_lie_alg + transformed_lie_alg #make 2 copies for transforms    
         
         if self.transform_img != None:
             orig, transformed = self.transform_img((imgs, intrinsics, lie_alg), (imgs, intrinsics, transformed_lie_alg)) 

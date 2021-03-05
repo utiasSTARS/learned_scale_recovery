@@ -58,8 +58,9 @@ if __name__=='__main__':
     path_to_ws = '/home/brandonwagstaff/learned_scale_recovery/' ##update this
     path_to_dset_downsized = '/media/datasets/KITTI-eigen-split/'
 
-    pretrained_plane_dir = 'results/plane-model-eigen-202101201842'
     dir = path_to_ws + 'results/final_models/eigen-depth-eval-scaled-202102141219'
+    pretrained_plane_dir = 'results/plane-model-eigen-202101201842'
+    
     cam_height=1.70
     median_scaling=False #align scale of predicted depth with ground truth using median depth
     plane_rescaling=False #align scale using ground plane detection and known camera height

@@ -15,7 +15,7 @@ path_to_dset_downsized = '/media/datasets/KITTI-odometry-downsized-stereo/'
 seq_list = ['09_02', '10_02']
 # method_list = ['Orbslam2', 'Unscaled', 'Scaled (online)', 'Scaled (ours)']
 method_list = ['Unscaled', 'Scaled online (DNet)', 'Scaled (ours)']
-use_gt_rot = True
+use_gt_rot = False
 
 dir_list =    [path_to_ws+'results/final_models/vo-kitti-unscaled-202102201302', \
     path_to_ws+'results/final_models/vo-kitti-unscaled-202102201302', \
